@@ -27,3 +27,6 @@ A collection of my mods for Castlevania: Symphony of the Night (SotN) static rec
    * `mods/InputOverlay/imgs/`
    * `mods/SplitTracker/times/`
 3. Configure overlay positions and options directly in the in-game mod settings.
+
+Here is little showcase video:
+[![Watch the video](https://img.youtube.com/vi/koOvq3wdRD8/maxresdefault.jpg)](https://youtu.be/koOvq3wdRD8)
