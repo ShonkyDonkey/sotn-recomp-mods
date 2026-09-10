@@ -1,0 +1,9 @@
+{
+    "id": "inputoverlay",
+    "name": "Input Overlay Mod",
+    "firstPartyMod": true,
+    "version": "Prerelease",
+    "author": "ShonkyDonkey",
+    "description": "Just testing posibilities!",
+    "dependencies": []
+}

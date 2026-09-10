@@ -1,0 +1,72 @@
+{
+  "GamepadDpadUp": {
+    "X": "160px",
+    "Y": "156px",
+    "ImageName": "up.png"
+  },
+  "GamepadDpadDown": {
+    "X": "160px",
+    "Y": "223px",
+    "ImageName": "down.png"
+  },
+  "GamepadDpadLeft": {
+    "X": "119px",
+    "Y": "193px",
+    "ImageName": "left.png"
+  },
+  "GamepadDpadRight": {
+    "X": "194px",
+    "Y": "193px",
+    "ImageName": "right.png"
+  },
+  "GamepadFaceUp": {
+    "X": "544px",
+    "Y": "126px",
+    "ImageName": "triangle.png"
+  },
+  "GamepadFaceDown": {
+    "X": "543px",
+    "Y": "239px",
+    "ImageName": "cross.png"
+  },
+  "GamepadFaceLeft": {
+    "X": "478px",
+    "Y": "182px",
+    "ImageName": "square.png"
+  },
+  "GamepadFaceRight": {
+    "X": "609px",
+    "Y": "183px",
+    "ImageName": "circle.png"
+  },
+  "GamepadL1": {
+    "X": "132px",
+    "Y": "63px",
+    "ImageName": "l1.png"
+  },
+  "GamepadR1": {
+    "X": "506px",
+    "Y": "63px",
+    "ImageName": "r1.png"
+  },
+  "GamepadL2": {
+    "X": "138px",
+    "Y": "27px",
+    "ImageName": "l2.png"
+  },
+  "GamepadR2": {
+    "X": "513px",
+    "Y": "27px",
+    "ImageName": "r2.png"
+  },
+  "GamepadStart": {
+    "X": "408px",
+    "Y": "221px",
+    "ImageName": "start.png"
+  },
+  "GamepadBack": {
+    "X": "322px",
+    "Y": "225px",
+    "ImageName": "select.png"
+  }
+}
