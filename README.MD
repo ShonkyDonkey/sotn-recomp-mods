@@ -22,7 +22,7 @@ A collection of my mods for Castlevania: Symphony of the Night (SotN) static rec
 
 ## Installation
 
-1. Copy the mod source files or compiled binaries into your game's `mods/` directory.
+1. Copy the mod source files into your game's `mods/` directory.
 2. Ensure the required assets folder structure exists:
    * `mods/InputOverlay/imgs/`
    * `mods/SplitTracker/times/`
