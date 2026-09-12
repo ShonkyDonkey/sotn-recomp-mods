@@ -12,7 +12,6 @@ A collection of my mods for Castlevania: Symphony of the Night (SotN) static rec
   * Configurable layout and positions via JSON settings (`mods/InputOverlay/imgs/joystick/positions.json`).
 
 ### 2. Split Tracker
-* **File:** `SplitTracker.cs`
 * **Description:** An in-game speedrun timer and boss split tracking overlay.
 * **Features:**
   * Automatic split tracking for boss defeats.
@@ -20,10 +19,19 @@ A collection of my mods for Castlevania: Symphony of the Night (SotN) static rec
   * Auto-saves best run times to local disk (`mods/SplitTracker/times`).
   * Resets upon returning to title/main menus.
 
+### 3. Fast Save
+* **Description:** Speeds up save-room sequences for faster speedruns.
+
 ## Installation
 
-1. Copy the mod source files or compiled binaries into your game's `mods/` directory.
+1. Copy the mod source files into your game's `mods/` directory.
 2. Ensure the required assets folder structure exists:
    * `mods/InputOverlay/imgs/`
    * `mods/SplitTracker/times/`
 3. Configure overlay positions and options directly in the in-game mod settings.
+
+Here is little showcase video of Input Overlay and Split Tracker:
+[![Watch the video](https://img.youtube.com/vi/koOvq3wdRD8/maxresdefault.jpg)](https://youtu.be/koOvq3wdRD8)
+
+Here is showcase video of Fast Save:
+[![Watch the video](https://img.youtube.com/vi/ZFF3ihwQdbQ/maxresdefault.jpg)](https://youtu.be/ZFF3ihwQdbQ)

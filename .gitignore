@@ -2,7 +2,6 @@
 *.svg
 blackout/
 CustomGear/
-FastSave/
 MemScanner/
 shaders/
 ZeroHealthMod/

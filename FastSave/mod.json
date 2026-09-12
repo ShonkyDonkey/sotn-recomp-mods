@@ -1,0 +1,9 @@
+{
+    "id": "fastsave",
+    "name": "Fast Save Mod",
+    "firstPartyMod": true,
+    "version": "Prerelease",
+    "author": "ShonkyDonkey",
+    "description": "Just testing posibilities!",
+    "dependencies": []
+}
