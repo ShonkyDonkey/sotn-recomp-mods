@@ -8,11 +8,10 @@ using Sotn;
 
 public sealed class FastSaveMod : IMod
 {
-    private const string Prefix = "mods.FastSave.";
 
     // Bool controlling if start menu can be open or not
     private const uint CanStartBePressedAddr = 0x8003C8B8u;
-    // Rando adress that siwtches from 0 to not 0 when save animation behins,
+    // Random adress that siwtches from 0 to not 0 when save animation begins,
     // not sure what is it but its always true during save animation in the save room
     // which lets us know when save anim has started
     private const uint AreWeSavingAddr = 0x8007F508u;
@@ -29,18 +28,13 @@ public sealed class FastSaveMod : IMod
 
     private bool fastSaveStarted;
 
-    public void OnLoad()
-    {
-        Event.AddListener<VSyncEvent>(OnVSync);
-    }
+    public void OnLoad() => Event.AddListener<VSyncEvent>(OnVSync);
 
-    public void OnUnload()
-    {
-        Event.RemoveListener<VSyncEvent>(OnVSync);
-    }
+    public void OnUnload() => Event.RemoveListener<VSyncEvent>(OnVSync);
 
     private void OnVSync(VSyncEvent e)
     {
+
         // LONG LIVE MACHINE LEARNING
         // Derp baboon if you are reading this you should know you are reatarded and living in delusions
         // Unless you are using BSD which is null, your fucking OS is full of AI CODE
@@ -55,7 +49,6 @@ public sealed class FastSaveMod : IMod
         }
 
         bool inSaveRoom = Game.CanSave;
-
         bool canStartBePressed = CanStartBePressed;
         bool areWeSaving = AreWeSaving;
 
@@ -73,16 +66,10 @@ public sealed class FastSaveMod : IMod
 
         // Once started, keep DemoTimer at zero whenever the game takes
         // control away from the player for the rest of the save-room visit.
-        if (fastSaveStarted && inSaveRoom && !Player.HasControl)
-        {
-            Player.DemoTimer = 0;
-        }
+        if (fastSaveStarted && inSaveRoom && !Player.HasControl) Player.DemoTimer = 0;
+            
 
         // Leaving the save room resets the fast-save state.
-        if (!inSaveRoom)
-        {
-            fastSaveStarted = false;
-        }
-
+        if (!inSaveRoom) fastSaveStarted = false;
     }
 }
