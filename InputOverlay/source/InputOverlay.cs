@@ -19,8 +19,8 @@ public sealed class InputOverlayMod : IMod
 {
     private const string Prefix = "mods.InputOverlay.";
 
-    private bool showInputOverlay = true;
     private int overlayWidth = 300;
+    private bool isPanelRegistered = false;
 
     private string ImagesDirectory => Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory,
@@ -28,6 +28,7 @@ public sealed class InputOverlayMod : IMod
 
     private InputDisplayPanel? inputPanel;
 
+    // Caches to prevent reloading and resizing textures from disk every frame
     private readonly Dictionary<string, TextureInfo> textureCache = new();
     private readonly Dictionary<string, TextureInfo> backgroundTextureCache = new();
     private readonly Dictionary<string, int> nativeBackgroundWidthCache = new();
@@ -56,6 +57,7 @@ public sealed class InputOverlayMod : IMod
         public string ImageName { get; set; } = "";
     }
 
+    // Connects our drawing logic to the engine's panel manager
     private sealed class InputDisplayPanel : IFloatingPanel
     {
         private readonly InputOverlayMod owner;
@@ -68,19 +70,13 @@ public sealed class InputOverlayMod : IMod
         public string Name => "InputDisplayOverlay";
         public string TitleKey => "Input Display";
 
-        public bool IsOpen
-        {
-            get => owner.showInputOverlay;
-            set
-            {
-                owner.showInputOverlay = value;
-                owner.Save();
-            }
-        }
+        // Required by the IFloatingPanel interface. 
+        // Hardcoded to true so the engine always attempts to draw it.
+        public bool IsOpen { get; set; } = true;
 
         public void Draw()
         {
-            if (!owner.showInputOverlay)
+            if (!IsOpen)
                 return;
 
             owner.DrawInputWindow();
@@ -93,18 +89,21 @@ public sealed class InputOverlayMod : IMod
         LoadJoystickConfig();
 
         inputPanel = new InputDisplayPanel(this);
-        SafeRegisterPanel(inputPanel);
+        
+        // Defer panel registration to the main thread's first frame to ensure the host UI is ready
+        Event.AddListener<VSyncEvent>(RegisterPanelOnMainThread);
     }
 
     public void OnUnload()
     {
+        // Safety catch in case the mod is unloaded before the first frame fires
+        Event.RemoveListener<VSyncEvent>(RegisterPanelOnMainThread);
+
         if (inputPanel != null)
         {
             SafeUnregisterPanel(inputPanel);
             inputPanel = null;
         }
-
-        showInputOverlay = false;
 
         textureCache.Clear();
         backgroundTextureCache.Clear();
@@ -112,29 +111,15 @@ public sealed class InputOverlayMod : IMod
         nativeImageSizeCache.Clear();
     }
 
-    private static void SafeRegisterPanel(IFloatingPanel panel)
+    private void RegisterPanelOnMainThread(VSyncEvent e)
     {
-        PanelManager.Register(panel);
-        /*Task.Run(async () =>
-        {
-            // Allow initial render loop startup to pass before registering
-            await Task.Delay(150);
-
-            bool registered = false;
-            for (int attempt = 0; attempt < 10 && !registered; attempt++)
-            {
-                try
-                {
-                    PanelManager.Register(panel);
-                    registered = true;
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[InputOverlay] Deferred registration attempt {attempt + 1} failed: {ex.Message}");
-                    await Task.Delay(100);
-                }
-            }
-        });*/
+        if (isPanelRegistered || inputPanel == null) return;
+        
+        PanelManager.Register(inputPanel);
+        isPanelRegistered = true;
+        
+        // Clean up the listener immediately after registration so it only runs once
+        Event.RemoveListener<VSyncEvent>(RegisterPanelOnMainThread);
     }
 
     private static void SafeUnregisterPanel(IFloatingPanel panel)
@@ -151,13 +136,9 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
+    // Renders the mod's configuration options in the mod settings menu
     public void DrawSettings()
     {
-        if (ImGui.Checkbox("Show Input Overlay Window", ref showInputOverlay))
-            Save();
-
-        ImGui.Separator();
-
         int newWidth = overlayWidth;
         if (ImGui.InputInt("Overlay Width", ref newWidth, 10, 50))
         {
@@ -176,11 +157,9 @@ public sealed class InputOverlayMod : IMod
         ImGui.TextDisabled(ImagesDirectory + Path.DirectorySeparatorChar + "joystick");
     }
 
+    // Core drawing loop for the actual on-screen overlay
     private void DrawInputWindow()
     {
-        if (!showInputOverlay)
-            return;
-
         try
         {
             const string folder = "joystick";
@@ -190,8 +169,8 @@ public sealed class InputOverlayMod : IMod
                 Path.Combine(folder, backgroundName),
                 overlayWidth);
 
+            // Determine the window size based on the background image ratio
             Vector2 windowSize;
-
             if (background != null && background.Width > 0 && background.Height > 0)
             {
                 windowSize = new Vector2(background.Width, background.Height);
@@ -201,6 +180,7 @@ public sealed class InputOverlayMod : IMod
                 windowSize = new Vector2(overlayWidth, 200f);
             }
 
+            // Setup a borderless, transparent, non-interactive ImGui window
             ImGui.SetNextWindowDockID(0, ImGuiCond.Always);
             ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
             ImGui.SetNextWindowPos(new Vector2(15f, 380f), ImGuiCond.FirstUseEver);
@@ -209,11 +189,8 @@ public sealed class InputOverlayMod : IMod
             ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0f);
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
 
-            bool open = showInputOverlay;
-
             if (ImGui.Begin(
                 "Input Display###InputOverlayWindow",
-                ref open,
                 ImGuiWindowFlags.NoScrollbar |
                 ImGuiWindowFlags.NoDecoration |
                 ImGuiWindowFlags.NoDocking))
@@ -233,6 +210,7 @@ public sealed class InputOverlayMod : IMod
                     scale = overlayWidth / nativeWidth;
                 }
 
+                // Draw the controller background first
                 if (background != null && background.Id != 0)
                 {
                     drawList.AddImage(
@@ -241,17 +219,12 @@ public sealed class InputOverlayMod : IMod
                         cursorStart + drawSize);
                 }
 
+                // Overlay active button presses on top of the background
                 DrawMappedPsxInputs(drawList, cursorStart, folder, scale, windowSize);
             }
 
             ImGui.End();
             ImGui.PopStyleVar(2);
-
-            if (open != showInputOverlay)
-            {
-                showInputOverlay = open;
-                Save();
-            }
         }
         catch (Exception ex)
         {
@@ -259,6 +232,7 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
+    // Maps standard controller inputs to visual representations
     private void DrawMappedPsxInputs(ImDrawListPtr drawList, Vector2 origin, string folder, float scale, Vector2 bgSize)
     {
         DrawPsxIfPressed(drawList, origin, folder, "GamepadDpadUp", Controller.Up, scale, bgSize);
@@ -281,6 +255,7 @@ public sealed class InputOverlayMod : IMod
 
     private void DrawPsxIfPressed(ImDrawListPtr drawList, Vector2 origin, string folder, string configName, ushort psxBit, float scale, Vector2 bgSize)
     {
+        // Skip drawing if the button is currently released
         if ((Controller.State & psxBit) != 0)
             return;
 
@@ -303,6 +278,7 @@ public sealed class InputOverlayMod : IMod
         if (pressTexture == null || pressTexture.Id == 0)
             return;
 
+        // Calculate final positions based on whether the config uses raw pixels or percentages
         (float xValue, bool xPixels) = ParsePosition(entry.X);
         (float yValue, bool yPixels) = ParsePosition(entry.Y);
 
@@ -320,6 +296,7 @@ public sealed class InputOverlayMod : IMod
         drawList.AddImage((nint)pressTexture.Id, pos, end);
     }
 
+    // Handles loading and resizing the background image efficiently
     private TextureInfo? GetResizedBackgroundTexture(string relativePath, int targetWidth)
     {
         targetWidth = Math.Clamp(targetWidth, 32, 4096);
@@ -344,6 +321,7 @@ public sealed class InputOverlayMod : IMod
             if (image == null || image.Width <= 0 || image.Height <= 0)
                 return null;
 
+            // If target width is larger than native, just use the native texture and let ImGui scale it
             if (targetWidth >= image.Width)
             {
                 uint texture = HostWindow.UploadTexture(image.Data, image.Width, image.Height);
@@ -354,6 +332,7 @@ public sealed class InputOverlayMod : IMod
                 return nativeInfo;
             }
 
+            // Downscale using Lanczos resampling for better quality
             float ratio = targetWidth / (float)image.Width;
             int targetHeight = Math.Max(1, (int)MathF.Round(image.Height * ratio));
 
@@ -428,6 +407,7 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
+    // Handles parsing position values from the config, stripping "px" or "dp" suffixes if present
     private static (float Value, bool Pixels) ParsePosition(JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.Number)
@@ -534,18 +514,18 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
+    // Persists view state using the engine's built-in save system
     private void Save()
     {
         var view = Runtime.View;
-        view.SetBool(Prefix + "inputOverlay", showInputOverlay);
         view.SetInt(Prefix + "overlayWidth", overlayWidth);
         Runtime.SaveView();
     }
 
+    // Loads saved settings or defaults to the native background width
     private void Load()
     {
         var view = Runtime.View;
-        showInputOverlay = view.GetBool(Prefix + "inputOverlay", true);
 
         int defaultWidth = 300;
         try
