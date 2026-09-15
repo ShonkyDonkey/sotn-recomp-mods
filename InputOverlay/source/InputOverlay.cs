@@ -21,6 +21,7 @@ public sealed class InputOverlayMod : IMod
 
     private int overlayWidth = 300;
     private bool isPanelRegistered = false;
+    private bool isModActive = false; // Kill switch for when Unregister fails
 
     private string ImagesDirectory => Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory,
@@ -28,7 +29,6 @@ public sealed class InputOverlayMod : IMod
 
     private InputDisplayPanel? inputPanel;
 
-    // Caches to prevent reloading and resizing textures from disk every frame
     private readonly Dictionary<string, TextureInfo> textureCache = new();
     private readonly Dictionary<string, TextureInfo> backgroundTextureCache = new();
     private readonly Dictionary<string, int> nativeBackgroundWidthCache = new();
@@ -57,7 +57,6 @@ public sealed class InputOverlayMod : IMod
         public string ImageName { get; set; } = "";
     }
 
-    // Connects our drawing logic to the engine's panel manager
     private sealed class InputDisplayPanel : IFloatingPanel
     {
         private readonly InputOverlayMod owner;
@@ -70,13 +69,13 @@ public sealed class InputOverlayMod : IMod
         public string Name => "InputDisplayOverlay";
         public string TitleKey => "Input Display";
 
-        // Required by the IFloatingPanel interface. 
-        // Hardcoded to true so the engine always attempts to draw it.
         public bool IsOpen { get; set; } = true;
 
         public void Draw()
         {
-            if (!IsOpen)
+            // If the mod is disabled or the panel is closed, do nothing.
+            // This prevents "ghost" panels from tracking inputs if SafeUnregisterPanel fails.
+            if (!owner.isModActive || !IsOpen)
                 return;
 
             owner.DrawInputWindow();
@@ -85,25 +84,31 @@ public sealed class InputOverlayMod : IMod
 
     public void OnLoad()
     {
+        isModActive = true;
+        isPanelRegistered = false;
+        
         Load();
         LoadJoystickConfig();
 
         inputPanel = new InputDisplayPanel(this);
         
-        // Defer panel registration to the main thread's first frame to ensure the host UI is ready
         Event.AddListener<VSyncEvent>(RegisterPanelOnMainThread);
     }
 
     public void OnUnload()
     {
-        // Safety catch in case the mod is unloaded before the first frame fires
+        isModActive = false; // Immediately stop all drawing and input tracking
+
         Event.RemoveListener<VSyncEvent>(RegisterPanelOnMainThread);
 
         if (inputPanel != null)
         {
+            inputPanel.IsOpen = false; // Hide it just in case
             SafeUnregisterPanel(inputPanel);
             inputPanel = null;
         }
+        
+        isPanelRegistered = false;
 
         textureCache.Clear();
         backgroundTextureCache.Clear();
@@ -113,13 +118,13 @@ public sealed class InputOverlayMod : IMod
 
     private void RegisterPanelOnMainThread(VSyncEvent e)
     {
-        if (isPanelRegistered || inputPanel == null) return;
+        if (isPanelRegistered || inputPanel == null || !isModActive) return;
         
         PanelManager.Register(inputPanel);
         isPanelRegistered = true;
         
-        // Clean up the listener immediately after registration so it only runs once
-        Event.RemoveListener<VSyncEvent>(RegisterPanelOnMainThread);
+        // NOTE: We no longer remove the listener here. Doing so during the 
+        // event enumeration caused the engine to crash on restart.
     }
 
     private static void SafeUnregisterPanel(IFloatingPanel panel)
@@ -136,7 +141,6 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
-    // Renders the mod's configuration options in the mod settings menu
     public void DrawSettings()
     {
         int newWidth = overlayWidth;
@@ -157,7 +161,6 @@ public sealed class InputOverlayMod : IMod
         ImGui.TextDisabled(ImagesDirectory + Path.DirectorySeparatorChar + "joystick");
     }
 
-    // Core drawing loop for the actual on-screen overlay
     private void DrawInputWindow()
     {
         try
@@ -169,7 +172,6 @@ public sealed class InputOverlayMod : IMod
                 Path.Combine(folder, backgroundName),
                 overlayWidth);
 
-            // Determine the window size based on the background image ratio
             Vector2 windowSize;
             if (background != null && background.Width > 0 && background.Height > 0)
             {
@@ -180,7 +182,6 @@ public sealed class InputOverlayMod : IMod
                 windowSize = new Vector2(overlayWidth, 200f);
             }
 
-            // Setup a borderless, transparent, non-interactive ImGui window
             ImGui.SetNextWindowDockID(0, ImGuiCond.Always);
             ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
             ImGui.SetNextWindowPos(new Vector2(15f, 380f), ImGuiCond.FirstUseEver);
@@ -210,7 +211,6 @@ public sealed class InputOverlayMod : IMod
                     scale = overlayWidth / nativeWidth;
                 }
 
-                // Draw the controller background first
                 if (background != null && background.Id != 0)
                 {
                     drawList.AddImage(
@@ -219,7 +219,6 @@ public sealed class InputOverlayMod : IMod
                         cursorStart + drawSize);
                 }
 
-                // Overlay active button presses on top of the background
                 DrawMappedPsxInputs(drawList, cursorStart, folder, scale, windowSize);
             }
 
@@ -232,7 +231,6 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
-    // Maps standard controller inputs to visual representations
     private void DrawMappedPsxInputs(ImDrawListPtr drawList, Vector2 origin, string folder, float scale, Vector2 bgSize)
     {
         DrawPsxIfPressed(drawList, origin, folder, "GamepadDpadUp", Controller.Up, scale, bgSize);
@@ -255,7 +253,6 @@ public sealed class InputOverlayMod : IMod
 
     private void DrawPsxIfPressed(ImDrawListPtr drawList, Vector2 origin, string folder, string configName, ushort psxBit, float scale, Vector2 bgSize)
     {
-        // Skip drawing if the button is currently released
         if ((Controller.State & psxBit) != 0)
             return;
 
@@ -278,7 +275,6 @@ public sealed class InputOverlayMod : IMod
         if (pressTexture == null || pressTexture.Id == 0)
             return;
 
-        // Calculate final positions based on whether the config uses raw pixels or percentages
         (float xValue, bool xPixels) = ParsePosition(entry.X);
         (float yValue, bool yPixels) = ParsePosition(entry.Y);
 
@@ -296,7 +292,6 @@ public sealed class InputOverlayMod : IMod
         drawList.AddImage((nint)pressTexture.Id, pos, end);
     }
 
-    // Handles loading and resizing the background image efficiently
     private TextureInfo? GetResizedBackgroundTexture(string relativePath, int targetWidth)
     {
         targetWidth = Math.Clamp(targetWidth, 32, 4096);
@@ -321,7 +316,6 @@ public sealed class InputOverlayMod : IMod
             if (image == null || image.Width <= 0 || image.Height <= 0)
                 return null;
 
-            // If target width is larger than native, just use the native texture and let ImGui scale it
             if (targetWidth >= image.Width)
             {
                 uint texture = HostWindow.UploadTexture(image.Data, image.Width, image.Height);
@@ -332,7 +326,6 @@ public sealed class InputOverlayMod : IMod
                 return nativeInfo;
             }
 
-            // Downscale using Lanczos resampling for better quality
             float ratio = targetWidth / (float)image.Width;
             int targetHeight = Math.Max(1, (int)MathF.Round(image.Height * ratio));
 
@@ -407,7 +400,6 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
-    // Handles parsing position values from the config, stripping "px" or "dp" suffixes if present
     private static (float Value, bool Pixels) ParsePosition(JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.Number)
@@ -514,7 +506,6 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
-    // Persists view state using the engine's built-in save system
     private void Save()
     {
         var view = Runtime.View;
@@ -522,7 +513,6 @@ public sealed class InputOverlayMod : IMod
         Runtime.SaveView();
     }
 
-    // Loads saved settings or defaults to the native background width
     private void Load()
     {
         var view = Runtime.View;
