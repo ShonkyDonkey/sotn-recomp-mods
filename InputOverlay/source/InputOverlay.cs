@@ -123,7 +123,7 @@ public sealed class InputOverlayMod : IMod
         PanelManager.Register(inputPanel);
         isPanelRegistered = true;
         
-        // NOTE: We no longer remove the listener here. Doing so during the 
+        // NOTE: no longer remove the listener here. Doing so during the 
         // event enumeration caused the engine to crash on restart.
     }
 
@@ -506,17 +506,32 @@ public sealed class InputOverlayMod : IMod
         }
     }
 
+    private string SettingsPath => Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        "mods", "InputOverlay", "settings.json");
+
+    private sealed class SettingsData
+    {
+        public int OverlayWidth { get; set; } = 300;
+    }
+
     private void Save()
     {
-        var view = Runtime.View;
-        view.SetInt(Prefix + "overlayWidth", overlayWidth);
-        Runtime.SaveView();
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+            var settings = new SettingsData { OverlayWidth = overlayWidth };
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(
+                settings, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception err)
+        {
+            Console.Error.WriteLine($"[InputOverlay] Failed to save settings: {err.Message}");
+        }
     }
 
     private void Load()
     {
-        var view = Runtime.View;
-
         int defaultWidth = 300;
         try
         {
@@ -531,7 +546,23 @@ public sealed class InputOverlayMod : IMod
         }
         catch { }
 
-        overlayWidth = view.GetInt(Prefix + "overlayWidth", defaultWidth);
+        overlayWidth = defaultWidth;
+
+        try
+        {
+            if (File.Exists(SettingsPath))
+            {
+                SettingsData? settings = JsonSerializer.Deserialize<SettingsData>(
+                    File.ReadAllText(SettingsPath));
+                if (settings != null)
+                    overlayWidth = settings.OverlayWidth;
+            }
+        }
+        catch (Exception err)
+        {
+            Console.Error.WriteLine($"[InputOverlay] Failed to load settings: {err.Message}");
+        }
+
         overlayWidth = Math.Clamp(overlayWidth, 32, 4096);
     }
 }

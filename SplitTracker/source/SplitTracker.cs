@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Numerics;
 using ImGuiNET;
 using RecompOne.Runtime;
@@ -180,7 +181,7 @@ public sealed class SplitTrackerMod : IMod
             ImGui.SameLine();
             string buttonText = "Reset Timer";
             float buttonWidth = ImGui.CalcTextSize(buttonText).X + ImGui.GetStyle().FramePadding.X * 2.0f;
-            float rightX = ImGui.GetContentRegionMax().X - buttonWidth;
+            float rightX = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X - buttonWidth;
 
             if (ImGui.GetCursorPosX() < rightX)
                 ImGui.SetCursorPosX(rightX);
@@ -400,18 +401,49 @@ public sealed class SplitTrackerMod : IMod
         catch (Exception err) { Console.WriteLine($"[SplitsTimer] Failed to load file: {err.Message}"); }
     }
 
+    private string SettingsPath => Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        "mods", "SplitTracker", "settings.json");
+
+    private sealed class SettingsData
+    {
+        public bool Enabled { get; set; } = true;
+        public bool Overlay { get; set; } = true;
+    }
+
     private void Save()
     {
-        var view = Runtime.View;
-        view.SetBool(Prefix + "enabled", modEnabled);
-        view.SetBool(Prefix + "overlay", showOverlay);
-        Runtime.SaveView();
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+            var settings = new SettingsData { Enabled = modEnabled, Overlay = showOverlay };
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(
+                settings, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception err)
+        {
+            Console.WriteLine($"[SplitTracker] Failed to save settings: {err.Message}");
+        }
     }
 
     private void Load()
     {
-        var view = Runtime.View;
-        modEnabled = view.GetBool(Prefix + "enabled", true);
-        showOverlay = view.GetBool(Prefix + "overlay", true);
+        try
+        {
+            if (!File.Exists(SettingsPath))
+                return;
+
+            SettingsData? settings = JsonSerializer.Deserialize<SettingsData>(
+                File.ReadAllText(SettingsPath));
+            if (settings == null)
+                return;
+
+            modEnabled = settings.Enabled;
+            showOverlay = settings.Overlay;
+        }
+        catch (Exception err)
+        {
+            Console.WriteLine($"[SplitTracker] Failed to load settings: {err.Message}");
+        }
     }
 }

@@ -1,3 +1,5 @@
+# Update
+*Mods updated to work with new v1.1.2p version of SymphonyRecomp, havent tested them on old version*
 # SotN Recomp Mods
 
 A collection of my mods for Castlevania: Symphony of the Night (SotN) static recompilation.
